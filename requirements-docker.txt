@@ -1,0 +1,19 @@
+# Minimal deps for web_demo_4_5.py in Docker (Python 3.10, CUDA base).
+# Only strict pins: torch/torchvision (match CUDA image), transformers (Qwen3Config), numpy (torch 2.1 needs <2).
+
+# Transformers in this stack requires torch>=2.4.
+torch>=2.4
+torchvision
+
+# Avoid NumPy 2.x incompatibilities with compiled wheels.
+numpy>=1.24,<2
+# MiniCPM-V 4.5 requires Qwen3Config (added in transformers 4.52).
+transformers>=4.52,<4.53
+
+accelerate
+safetensors
+huggingface-hub
+tokenizers
+Pillow
+gradio>=5.0,<6
+peft

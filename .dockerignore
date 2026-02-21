@@ -1,0 +1,21 @@
+# Don't copy into image
+.venv
+venv
+env
+__pycache__
+*.pyc
+.git
+.gitignore
+*.md
+!web_demos/**/*.md
+models
+*.bk
+.DS_Store
+.cursor
+*.pdf
+eval_mm
+finetune
+omnilmm
+chat.py
+main.py
+a.txt
