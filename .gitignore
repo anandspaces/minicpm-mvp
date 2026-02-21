@@ -7,3 +7,4 @@ docs/
 *.md
 .venv
 cmds.txt
+assets/
