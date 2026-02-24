@@ -17,3 +17,5 @@ tokenizers
 Pillow
 gradio>=5.0,<6
 peft
+# Video support (web_demo_4_5.py uses VideoReader).
+decord
