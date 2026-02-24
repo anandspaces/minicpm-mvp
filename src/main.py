@@ -527,6 +527,10 @@ async def ws_endpoint(websocket: WebSocket):
                     for token in gen:
                         full_text += token
                         await send("chat_token", {"text": token})
+                except WebSocketDisconnect:
+                    log.info("Client disconnected during chat streaming")
+                    session["context"].pop()
+                    raise
                 except Exception as e:
                     log.exception("chat streaming error")
                     await send("error", {"message": str(e)})
@@ -617,6 +621,10 @@ async def ws_endpoint(websocket: WebSocket):
                     for token in gen:
                         full_text += token
                         await send("chat_token", {"text": token})
+                except WebSocketDisconnect:
+                    log.info("Client disconnected during regenerate streaming")
+                    session["context"].pop()
+                    raise
                 except Exception as e:
                     log.exception("regenerate error")
                     await send("error", {"message": str(e)})
