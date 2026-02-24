@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniCPM-V 4.5</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --bg2: #1a1b26;
+  --bg3: #24253a;
+  --border: #2e2f45;
+  --text: #e1e2e8;
+  --text2: #9ca0b0;
+  --accent: #7c8aff;
+  --accent2: #5b6abf;
+  --user-bg: #2a2d4a;
+  --bot-bg: #1e2035;
+  --danger: #e05566;
+  --success: #4caf82;
+  --radius: 10px;
+  --sidebar-w: 280px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Top bar ──────────────────────────────────────────── */
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.topbar h1 { font-size: 16px; font-weight: 600; }
+.topbar .status { font-size: 12px; display: flex; align-items: center; gap: 6px; color: var(--text2); }
+.topbar .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+.topbar .dot.connected { background: var(--success); }
+
+/* ── Tabs ─────────────────────────────────────────────── */
+.tabs { display: flex; gap: 0; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; padding: 0 20px; }
+.tab { padding: 10px 24px; cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text2); border-bottom: 2px solid transparent; transition: all .2s; user-select: none; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Main layout ──────────────────────────────────────── */
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ──────────────────────────────────────────── */
+.sidebar { width: var(--sidebar-w); background: var(--bg2); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+.sidebar h3 { font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.sidebar label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text2); }
+.sidebar input[type="range"] { width: 100%; accent-color: var(--accent); }
+.sidebar input[type="number"], .sidebar textarea, .sidebar select { background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 12px; width: 100%; }
+.sidebar textarea { resize: vertical; min-height: 48px; font-family: inherit; }
+.toggle-row { display: flex; align-items: center; justify-content: space-between; }
+.toggle-row span { font-size: 12px; color: var(--text2); }
+.switch { position: relative; width: 36px; height: 20px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .slider { position: absolute; inset: 0; background: var(--bg3); border-radius: 20px; cursor: pointer; transition: .2s; }
+.switch .slider::before { content: ''; position: absolute; width: 16px; height: 16px; left: 2px; bottom: 2px; background: var(--text2); border-radius: 50%; transition: .2s; }
+.switch input:checked + .slider { background: var(--accent); }
+.switch input:checked + .slider::before { transform: translateX(16px); background: #fff; }
+.range-val { font-size: 11px; color: var(--accent); font-weight: 600; float: right; }
+
+/* ── Content area ─────────────────────────────────────── */
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Media area (top part of content) ─────────────────── */
+.media-area { padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; min-height: 60px; }
+.media-area.hidden { display: none; }
+
+.drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 28px; text-align: center; color: var(--text2); font-size: 13px; cursor: pointer; transition: border-color .2s; }
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--accent); }
+.drop-zone input { display: none; }
+.thumbs { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.thumbs img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+.thumbs .remove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: var(--danger); border-radius: 50%; color: #fff; font-size: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; }
+.thumb-wrap { position: relative; display: inline-block; }
+
+.video-upload-area { display: flex; flex-direction: column; gap: 10px; }
+.video-upload-area video { max-height: 160px; border-radius: var(--radius); background: #000; }
+.video-info { font-size: 12px; color: var(--text2); }
+
+.live-area { display: flex; gap: 16px; align-items: flex-start; }
+.live-area video { width: 240px; height: 180px; border-radius: var(--radius); background: #000; object-fit: cover; }
+.live-controls { display: flex; flex-direction: column; gap: 8px; }
+.live-status { font-size: 12px; color: var(--text2); }
+
+/* ── Chat area ────────────────────────────────────────── */
+.chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.messages { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 85%; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.msg.user { align-self: flex-end; background: var(--user-bg); border-bottom-right-radius: 2px; }
+.msg.bot { align-self: flex-start; background: var(--bot-bg); border-bottom-left-radius: 2px; }
+.msg.bot.streaming { border-left: 2px solid var(--accent); }
+.msg.system { align-self: center; color: var(--text2); font-size: 12px; background: none; padding: 4px; }
+.msg .thinking { color: var(--text2); font-style: italic; }
+
+/* ── Input bar ────────────────────────────────────────── */
+.input-bar { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--bg2); flex-shrink: 0; }
+.input-bar input { flex: 1; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 10px 14px; border-radius: var(--radius); font-size: 13px; outline: none; }
+.input-bar input:focus { border-color: var(--accent); }
+.btn { padding: 8px 18px; border-radius: var(--radius); border: none; cursor: pointer; font-size: 12px; font-weight: 600; transition: opacity .2s; }
+.btn:hover { opacity: .85; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-secondary { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-success { background: var(--success); color: #fff; }
+.action-btns { display: flex; gap: 6px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <h1>MiniCPM-V 4.5</h1>
+  <div class="status"><div class="dot" id="statusDot"></div><span id="statusText">Connecting…</span></div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs">
+  <div class="tab active" data-tab="photo">Photo Chat</div>
+  <div class="tab" data-tab="video">Video Chat</div>
+  <div class="tab" data-tab="live">Live Video</div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <h3>Settings</h3>
+
+    <div class="toggle-row">
+      <span>Thinking Mode</span>
+      <label class="switch"><input type="checkbox" id="cfgThinking"><span class="slider"></span></label>
+    </div>
+
+    <div class="toggle-row">
+      <span>Sampling</span>
+      <label class="switch"><input type="checkbox" id="cfgSampling" checked><span class="slider"></span></label>
+    </div>
+
+    <label>Temperature <span class="range-val" id="valTemp">0.7</span>
+      <input type="range" id="cfgTemp" min="0" max="2" step="0.05" value="0.7">
+    </label>
+
+    <label>Top P <span class="range-val" id="valTopP">0.8</span>
+      <input type="range" id="cfgTopP" min="0" max="1" step="0.05" value="0.8">
+    </label>
+
+    <label>Top K <span class="range-val" id="valTopK">100</span>
+      <input type="range" id="cfgTopK" min="0" max="200" step="1" value="100">
+    </label>
+
+    <label>Rep. Penalty <span class="range-val" id="valRep">1.05</span>
+      <input type="range" id="cfgRep" min="1" max="2" step="0.01" value="1.05">
+    </label>
+
+    <label>Max New Tokens <span class="range-val" id="valTokens">2048</span>
+      <input type="range" id="cfgTokens" min="64" max="4096" step="64" value="2048">
+    </label>
+
+    <label>System Prompt
+      <textarea id="cfgSystem" placeholder="Optional system prompt…" rows="2"></textarea>
+    </label>
+
+    <div id="liveSettings" style="display:none">
+      <h3 style="margin-top:8px">Live Settings</h3>
+      <label>Buffer Size <span class="range-val" id="valFrames">16</span>
+        <input type="range" id="cfgFrames" min="4" max="64" step="1" value="16">
+      </label>
+      <label>Capture Interval (ms) <span class="range-val" id="valInterval">200</span>
+        <input type="range" id="cfgInterval" min="50" max="2000" step="50" value="200">
+      </label>
+    </div>
+
+    <div id="videoSettings" style="display:none">
+      <h3 style="margin-top:8px">Video Settings</h3>
+      <label>Decode FPS <span class="range-val" id="valFps">3</span>
+        <input type="range" id="cfgFps" min="1" max="10" step="1" value="3">
+      </label>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Media areas (one per tab, toggled) -->
+    <div class="media-area" id="mediaPhoto">
+      <div class="drop-zone" id="photoDropZone">
+        <span>Drop images here or click to select</span>
+        <input type="file" id="photoInput" accept="image/*" multiple>
+      </div>
+      <div class="thumbs" id="photoThumbs"></div>
+    </div>
+
+    <div class="media-area hidden" id="mediaVideo">
+      <div class="video-upload-area">
+        <div class="drop-zone" id="videoDropZone">
+          <span>Drop a video file here or click to select</span>
+          <input type="file" id="videoInput" accept="video/*">
+        </div>
+        <video id="videoPreview" controls style="display:none"></video>
+        <div class="video-info" id="videoInfo"></div>
+      </div>
+    </div>
+
+    <div class="media-area hidden" id="mediaLive">
+      <div class="live-area">
+        <video id="webcamVideo" autoplay playsinline muted></video>
+        <div class="live-controls">
+          <button class="btn btn-success" id="btnStartCam">Start Camera</button>
+          <button class="btn btn-danger" id="btnStopCam" style="display:none">Stop Camera</button>
+          <div class="live-status" id="liveStatus">Camera off</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat-area">
+      <div class="messages" id="messages"></div>
+      <div class="input-bar">
+        <input type="text" id="chatInput" placeholder="Type your message…" autocomplete="off">
+        <button class="btn btn-primary" id="btnSend">Send</button>
+        <div class="action-btns">
+          <button class="btn btn-secondary" id="btnRegen" title="Regenerate">&#x21bb;</button>
+          <button class="btn btn-secondary" id="btnClear" title="Clear chat">&#x2715;</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<canvas id="captureCanvas" style="display:none"></canvas>
+
+<script>
+(function() {
+  // ── State ────────────────────────────────────────────
+  let ws = null;
+  let currentTab = 'photo';
+  let isStreaming = false;
+  let webcamStream = null;
+  let captureInterval = null;
+  let pendingImages = [];
+
+  // ── DOM refs ─────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const statusDot = $('statusDot');
+  const statusText = $('statusText');
+  const messagesEl = $('messages');
+  const chatInput = $('chatInput');
+  const btnSend = $('btnSend');
+  const btnRegen = $('btnRegen');
+  const btnClear = $('btnClear');
+  const photoDropZone = $('photoDropZone');
+  const photoInput = $('photoInput');
+  const photoThumbs = $('photoThumbs');
+  const videoDropZone = $('videoDropZone');
+  const videoInput = $('videoInput');
+  const videoPreview = $('videoPreview');
+  const videoInfo = $('videoInfo');
+  const webcamVideo = $('webcamVideo');
+  const btnStartCam = $('btnStartCam');
+  const btnStopCam = $('btnStopCam');
+  const liveStatus = $('liveStatus');
+  const captureCanvas = $('captureCanvas');
+
+  // ── Tabs ─────────────────────────────────────────────
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tab.dataset.tab;
+      $('mediaPhoto').classList.toggle('hidden', currentTab !== 'photo');
+      $('mediaVideo').classList.toggle('hidden', currentTab !== 'video');
+      $('mediaLive').classList.toggle('hidden', currentTab !== 'live');
+      $('liveSettings').style.display = currentTab === 'live' ? '' : 'none';
+      $('videoSettings').style.display = currentTab === 'video' ? '' : 'none';
+    });
+  });
+
+  // ── Range sliders → display values ───────────────────
+  const rangeMap = {
+    cfgTemp: 'valTemp', cfgTopP: 'valTopP', cfgTopK: 'valTopK',
+    cfgRep: 'valRep', cfgTokens: 'valTokens', cfgFrames: 'valFrames',
+    cfgInterval: 'valInterval', cfgFps: 'valFps'
+  };
+  Object.entries(rangeMap).forEach(([inputId, valId]) => {
+    const inp = $(inputId);
+    if (!inp) return;
+    inp.addEventListener('input', () => {
+      $(valId).textContent = inp.value;
+      sendConfig();
+    });
+  });
+  $('cfgThinking').addEventListener('change', sendConfig);
+  $('cfgSampling').addEventListener('change', sendConfig);
+
+  function getConfig() {
+    return {
+      enable_thinking: $('cfgThinking').checked,
+      sampling: $('cfgSampling').checked,
+      temperature: parseFloat($('cfgTemp').value),
+      top_p: parseFloat($('cfgTopP').value),
+      top_k: parseInt($('cfgTopK').value),
+      repetition_penalty: parseFloat($('cfgRep').value),
+      max_new_tokens: parseInt($('cfgTokens').value),
+      system_prompt: $('cfgSystem').value,
+      max_frames: parseInt($('cfgFrames').value),
+      video_fps: parseInt($('cfgFps').value),
+    };
+  }
+  function sendConfig() {
+    wsSend({action: 'set_config', config: getConfig()});
+  }
+
+  // ── WebSocket ────────────────────────────────────────
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}/ws`);
+    ws.onopen = () => {
+      statusDot.classList.add('connected');
+      statusText.textContent = 'Connected';
+    };
+    ws.onclose = () => {
+      statusDot.classList.remove('connected');
+      statusText.textContent = 'Disconnected — reconnecting…';
+      setTimeout(connect, 2000);
+    };
+    ws.onerror = () => ws.close();
+    ws.onmessage = e => handleEvent(JSON.parse(e.data));
+  }
+  connect();
+
+  function wsSend(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
+  }
+
+  // ── Handle server events ─────────────────────────────
+  let currentBotMsg = null;
+
+  function handleEvent(ev) {
+    const {event, data} = ev;
+    switch (event) {
+      case 'session_ready':
+        addSystemMsg('Session ready. Upload media and start chatting.');
+        break;
+      case 'upload_started':
+        addSystemMsg(`Uploading ${data.type}…`);
+        break;
+      case 'upload_done':
+        if (data.type === 'image') {
+          addSystemMsg(`${data.count} image(s) uploaded.`);
+        } else {
+          addSystemMsg(`Video uploaded: ${data.duration}s, ${data.frame_count} frames, packing=${data.packing}`);
+        }
+        break;
+      case 'chat_started':
+        isStreaming = true;
+        btnSend.disabled = true;
+        currentBotMsg = addBotMsg('');
+        currentBotMsg.classList.add('streaming');
+        break;
+      case 'chat_token':
+        if (currentBotMsg) {
+          appendToMsg(currentBotMsg, data.text);
+        }
+        break;
+      case 'chat_done':
+        if (currentBotMsg) {
+          currentBotMsg.classList.remove('streaming');
+          setMsgText(currentBotMsg, formatThinking(data.text));
+        }
+        currentBotMsg = null;
+        isStreaming = false;
+        btnSend.disabled = false;
+        break;
+      case 'error':
+        addSystemMsg(`Error: ${data.message}`);
+        isStreaming = false;
+        btnSend.disabled = false;
+        if (currentBotMsg) currentBotMsg.classList.remove('streaming');
+        currentBotMsg = null;
+        break;
+      case 'cleared':
+        messagesEl.innerHTML = '';
+        addSystemMsg('Chat cleared.');
+        break;
+      case 'config_updated':
+        break;
+    }
+  }
+
+  function formatThinking(text) {
+    return text.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) =>
+      `<span class="thinking">[Thinking] ${t.trim()}</span>\n`
+    );
+  }
+
+  // ── Chat messages ────────────────────────────────────
+  function addMsg(cls, text) {
+    const el = document.createElement('div');
+    el.className = `msg ${cls}`;
+    el.innerHTML = text;
+    messagesEl.appendChild(el);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return el;
+  }
+  function addUserMsg(text) { return addMsg('user', escHtml(text)); }
+  function addBotMsg(text) { return addMsg('bot', text); }
+  function addSystemMsg(text) { return addMsg('system', escHtml(text)); }
+  function appendToMsg(el, text) {
+    el.textContent += text;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function setMsgText(el, html) {
+    el.innerHTML = html;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+  function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  // ── Send chat ────────────────────────────────────────
+  function sendChat() {
+    const text = chatInput.value.trim();
+    if (!text || isStreaming) return;
+    addUserMsg(text);
+    wsSend({action: 'chat', text, mode: currentTab});
+    chatInput.value = '';
+  }
+  btnSend.addEventListener('click', sendChat);
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+  btnRegen.addEventListener('click', () => { if (!isStreaming) wsSend({action: 'regenerate'}); });
+  btnClear.addEventListener('click', () => { if (!isStreaming) wsSend({action: 'clear'}); });
+
+  // ── Photo upload ─────────────────────────────────────
+  photoDropZone.addEventListener('click', () => photoInput.click());
+  photoDropZone.addEventListener('dragover', e => { e.preventDefault(); photoDropZone.classList.add('dragover'); });
+  photoDropZone.addEventListener('dragleave', () => photoDropZone.classList.remove('dragover'));
+  photoDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    photoDropZone.classList.remove('dragover');
+    handlePhotoFiles(e.dataTransfer.files);
+  });
+  photoInput.addEventListener('change', e => handlePhotoFiles(e.target.files));
+
+  function handlePhotoFiles(files) {
+    if (!files.length) return;
+    pendingImages = [];
+    photoThumbs.innerHTML = '';
+    const promises = [];
+    for (const f of files) {
+      promises.push(new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const b64 = ev.target.result.split(',')[1];
+          pendingImages.push(b64);
+          const wrap = document.createElement('div');
+          wrap.className = 'thumb-wrap';
+          const img = document.createElement('img');
+          img.src = ev.target.result;
+          wrap.appendChild(img);
+          photoThumbs.appendChild(wrap);
+          resolve();
+        };
+        reader.readAsDataURL(f);
+      }));
+    }
+    Promise.all(promises).then(() => {
+      wsSend({action: 'upload_images', images: pendingImages});
+    });
+  }
+
+  // ── Video upload ─────────────────────────────────────
+  videoDropZone.addEventListener('click', () => videoInput.click());
+  videoDropZone.addEventListener('dragover', e => { e.preventDefault(); videoDropZone.classList.add('dragover'); });
+  videoDropZone.addEventListener('dragleave', () => videoDropZone.classList.remove('dragover'));
+  videoDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    videoDropZone.classList.remove('dragover');
+    handleVideoFile(e.dataTransfer.files[0]);
+  });
+  videoInput.addEventListener('change', e => handleVideoFile(e.target.files[0]));
+
+  function handleVideoFile(file) {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    videoPreview.src = url;
+    videoPreview.style.display = '';
+    videoInfo.textContent = `${file.name} (${(file.size / 1e6).toFixed(1)} MB) — encoding on server…`;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const b64 = ev.target.result.split(',')[1];
+      const fps = parseInt($('cfgFps').value) || 3;
+      wsSend({action: 'upload_video', data: b64, fps});
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Live webcam ──────────────────────────────────────
+  btnStartCam.addEventListener('click', startWebcam);
+  btnStopCam.addEventListener('click', stopWebcam);
+
+  async function startWebcam() {
+    try {
+      webcamStream = await navigator.mediaDevices.getUserMedia({video: true, audio: false});
+      webcamVideo.srcObject = webcamStream;
+      btnStartCam.style.display = 'none';
+      btnStopCam.style.display = '';
+      liveStatus.textContent = 'Camera active — streaming frames';
+      const intervalMs = parseInt($('cfgInterval').value) || 200;
+      captureInterval = setInterval(captureFrame, intervalMs);
+    } catch (err) {
+      liveStatus.textContent = `Camera error: ${err.message}`;
+    }
+  }
+
+  function stopWebcam() {
+    if (webcamStream) {
+      webcamStream.getTracks().forEach(t => t.stop());
+      webcamStream = null;
+    }
+    webcamVideo.srcObject = null;
+    if (captureInterval) { clearInterval(captureInterval); captureInterval = null; }
+    btnStartCam.style.display = '';
+    btnStopCam.style.display = 'none';
+    liveStatus.textContent = 'Camera off';
+  }
+
+  function captureFrame() {
+    if (!webcamVideo.videoWidth) return;
+    const canvas = captureCanvas;
+    const scale = Math.min(1, 640 / webcamVideo.videoWidth);
+    canvas.width = Math.round(webcamVideo.videoWidth * scale);
+    canvas.height = Math.round(webcamVideo.videoHeight * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+    const b64 = dataUrl.split(',')[1];
+    wsSend({action: 'frame', data: b64});
+  }
+})();
+</script>
+</body>
+</html>
