@@ -41,7 +41,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .main { display: flex; flex: 1; overflow: hidden; }
 
 /* ── Sidebar ──────────────────────────────────────────── */
-.sidebar { width: var(--sidebar-w); background: var(--bg2); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px; }
+.sidebar-wrap { width: var(--sidebar-w); min-width: var(--sidebar-w); flex-shrink: 0; transition: width 0.2s ease, min-width 0.2s ease; overflow: hidden; display: flex; flex-direction: column; background: var(--bg2); border-right: 1px solid var(--border); }
+.sidebar-wrap.collapsed { width: 0; min-width: 0; border-right-width: 0; }
+.sidebar-toggle { position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 24px; height: 48px; background: var(--bg2); border: 1px solid var(--border); border-left: none; border-radius: 0 8px 8px 0; cursor: pointer; color: var(--text2); font-size: 12px; display: flex; align-items: center; justify-content: center; z-index: 10; transition: color .2s; }
+.sidebar-toggle:hover { color: var(--accent); }
+.sidebar-wrap.collapsed + .sidebar-toggle .toggle-icon { transform: rotate(180deg); }
+.main { position: relative; }
+.sidebar { width: var(--sidebar-w); padding: 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0; }
 .sidebar h3 { font-size: 13px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
 .sidebar label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text2); }
 .sidebar input[type="range"] { width: 100%; accent-color: var(--accent); }
@@ -103,6 +109,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .btn-danger { background: var(--danger); color: #fff; }
 .btn-success { background: var(--success); color: #fff; }
 .action-btns { display: flex; gap: 6px; }
+.stt-hint { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.input-bar.listening .stt-hint { color: var(--accent); }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
@@ -127,7 +135,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <!-- Main -->
 <div class="main">
-
+  <div class="sidebar-wrap collapsed" id="sidebarWrap">
   <!-- Sidebar -->
   <div class="sidebar">
     <h3>Settings</h3>
@@ -140,6 +148,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div class="toggle-row">
       <span>Sampling</span>
       <label class="switch"><input type="checkbox" id="cfgSampling" checked><span class="slider"></span></label>
+    </div>
+
+    <div class="toggle-row">
+      <span>Speak responses (TTS)</span>
+      <label class="switch"><input type="checkbox" id="cfgTts"><span class="slider"></span></label>
     </div>
 
     <label>Temperature <span class="range-val" id="valTemp">0.7</span>
@@ -183,6 +196,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
       </label>
     </div>
   </div>
+  </div>
+
+  <button type="button" class="sidebar-toggle" id="btnSidebarToggle" title="Toggle settings"><span class="toggle-icon">&#9664;</span></button>
 
   <!-- Content -->
   <div class="content">
@@ -221,8 +237,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <!-- Chat -->
     <div class="chat-area">
       <div class="messages" id="messages"></div>
-      <div class="input-bar">
-        <input type="text" id="chatInput" placeholder="Type your message…" autocomplete="off">
+      <div class="input-bar" id="inputBar">
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+          <input type="text" id="chatInput" placeholder="Type or speak…" autocomplete="off">
+          <span class="stt-hint" id="sttHint">Focus to use voice input</span>
+        </div>
         <button class="btn btn-primary" id="btnSend">Send</button>
         <div class="action-btns">
           <button class="btn btn-secondary" id="btnRegen" title="Regenerate">&#x21bb;</button>
@@ -245,6 +264,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   let webcamStream = null;
   let captureInterval = null;
   let pendingImages = [];
+  let isListening = false;
+  let recognition = null;
+  let lastSttTranscript = '';  // transcript when we added user bubble from STT (to avoid duplicate on Send)
+  let sttFinalBuffer = '';     // committed text before current interim
+  const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let ttsEnabled = false;
 
   // ── DOM refs ─────────────────────────────────────────
   const $ = id => document.getElementById(id);
@@ -255,6 +280,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   const btnSend = $('btnSend');
   const btnRegen = $('btnRegen');
   const btnClear = $('btnClear');
+  const inputBar = $('inputBar');
+  const sttHint = $('sttHint');
+  const sidebarWrap = $('sidebarWrap');
+  const btnSidebarToggle = $('btnSidebarToggle');
   const photoDropZone = $('photoDropZone');
   const photoInput = $('photoInput');
   const photoThumbs = $('photoThumbs');
@@ -298,6 +327,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   });
   $('cfgThinking').addEventListener('change', sendConfig);
   $('cfgSampling').addEventListener('change', sendConfig);
+  $('cfgTts').addEventListener('change', () => {
+    ttsEnabled = $('cfgTts').checked;
+    try { localStorage.setItem('minicpm-tts', ttsEnabled ? '1' : '0'); } catch (_) {}
+  });
+  try { if (localStorage.getItem('minicpm-tts') !== '0') { ttsEnabled = true; if ($('cfgTts')) $('cfgTts').checked = true; } } catch (_) {}
+  if ($('cfgTts') && !$('cfgTts').checked && ttsEnabled) $('cfgTts').checked = true;
+
+  // ── Sidebar collapse ──────────────────────────────────
+  if (btnSidebarToggle && sidebarWrap) {
+    btnSidebarToggle.addEventListener('click', () => {
+      sidebarWrap.classList.toggle('collapsed');
+      btnSidebarToggle.title = sidebarWrap.classList.contains('collapsed') ? 'Show settings' : 'Hide settings';
+    });
+    btnSidebarToggle.title = 'Show settings';
+  }
 
   function getConfig() {
     return {
@@ -334,6 +378,69 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     ws.onmessage = e => handleEvent(JSON.parse(e.data));
   }
   connect();
+
+  // ── Speech recognition (browser STT) — auto on focus ───
+  function startStt() {
+    if (isStreaming || isListening || !SpeechRecognitionAPI) return;
+    sttFinalBuffer = '';
+    chatInput.value = '';
+    recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || 'en-US';
+    recognition.onresult = function(e) {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const transcript = e.results[i][0].transcript;
+        if (e.results[i].isFinal) {
+          sttFinalBuffer += transcript + ' ';
+          interim = '';
+        } else {
+          interim = transcript;
+        }
+      }
+      chatInput.value = (sttFinalBuffer + interim).trim();
+    };
+    recognition.onend = function() {
+      if (isListening && recognition) recognition.start();
+    };
+    recognition.onerror = function(e) {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        if (sttHint) sttHint.textContent = 'Microphone access denied';
+        stopStt();
+      } else if (e.error !== 'aborted' && sttHint) {
+        sttHint.textContent = 'Voice error: ' + e.error;
+      }
+    };
+    try {
+      recognition.start();
+      isListening = true;
+      if (inputBar) inputBar.classList.add('listening');
+      if (sttHint) sttHint.textContent = 'Listening…';
+    } catch (err) {
+      if (sttHint) sttHint.textContent = 'Could not start voice: ' + err.message;
+    }
+  }
+
+  function stopStt() {
+    if (!recognition) return;
+    isListening = false;
+    try { recognition.stop(); } catch (_) {}
+    recognition = null;
+    if (inputBar) inputBar.classList.remove('listening');
+    if (sttHint) sttHint.textContent = 'Focus to use voice input';
+    lastSttTranscript = '';
+  }
+
+  if (SpeechRecognitionAPI && chatInput) {
+    chatInput.addEventListener('focus', () => {
+      ensureTtsVoices(function() {});
+      if (!isStreaming) startStt();
+    });
+    chatInput.addEventListener('blur', () => { if (isListening) stopStt(); });
+  } else if (sttHint) {
+    sttHint.textContent = 'Voice input not supported';
+  }
 
   function wsSend(obj) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
@@ -377,6 +484,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         currentBotMsg = null;
         isStreaming = false;
         btnSend.disabled = false;
+        if (ttsEnabled && data.text) speakResponse(data.text);
         break;
       case 'error':
         addSystemMsg(`Error: ${data.message}`);
@@ -387,6 +495,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         break;
       case 'cleared':
         messagesEl.innerHTML = '';
+        lastSttTranscript = '';
         addSystemMsg('Chat cleared.');
         break;
       case 'config_updated':
@@ -398,6 +507,58 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     return text.replace(/<think>([\s\S]*?)<\/think>/g, (_, t) =>
       `<span class="thinking">[Thinking] ${t.trim()}</span>\n`
     );
+  }
+
+  function stripForTts(text) {
+    if (typeof text !== 'string') return '';
+    return text
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<ref>/gi, '')
+      .replace(/<\/ref>/gi, '')
+      .replace(/<box>/gi, '')
+      .replace(/<\/box>/gi, '')
+      .replace(/<box>[\s\S]*?<\/box>/gi, '')
+      .trim();
+  }
+
+  let ttsVoicesReady = false;
+  function ensureTtsVoices(cb) {
+    if (ttsVoicesReady && typeof cb === 'function') { cb(); return; }
+    if (!window.speechSynthesis) { if (cb) cb(); return; }
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) { ttsVoicesReady = true; if (cb) cb(); return; }
+    window.speechSynthesis.onvoiceschanged = function() {
+      ttsVoicesReady = true;
+      if (typeof cb === 'function') cb();
+    };
+    setTimeout(function() { if (!ttsVoicesReady) { ttsVoicesReady = true; if (cb) cb(); } }, 500);
+  }
+
+  function speakResponse(text) {
+    const plain = stripForTts(text);
+    if (!plain) return;
+    ensureTtsVoices(function() {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      var lang = navigator.language || 'en-US';
+      var chunks = plain.match(/[^.!?]+[.!?]*/g) || [plain];
+      if (chunks.length > 20) chunks = [plain];
+      var idx = 0;
+      function speakNext() {
+        if (idx >= chunks.length) return;
+        var t = chunks[idx].trim();
+        idx++;
+        if (!t) { speakNext(); return; }
+        var u = new SpeechSynthesisUtterance(t);
+        u.lang = lang;
+        u.rate = 1;
+        u.pitch = 1;
+        u.onend = function() { speakNext(); };
+        u.onerror = function() { speakNext(); };
+        window.speechSynthesis.speak(u);
+      }
+      speakNext();
+    });
   }
 
   // ── Chat messages ────────────────────────────────────
@@ -424,9 +585,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
   // ── Send chat ────────────────────────────────────────
   function sendChat() {
+    if (isStreaming) return;
+    if (isListening && recognition) stopStt();
     const text = chatInput.value.trim();
-    if (!text || isStreaming) return;
-    addUserMsg(text);
+    if (!text) return;
+    const lastUser = Array.from(messagesEl.querySelectorAll('.msg.user')).pop();
+    const alreadyShown = lastUser && lastUser.textContent.trim() === text;
+    if (!alreadyShown) addUserMsg(text);
+    lastSttTranscript = '';
     wsSend({action: 'chat', text, mode: currentTab});
     chatInput.value = '';
   }
