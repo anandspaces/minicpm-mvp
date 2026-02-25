@@ -1,0 +1,35 @@
+# Web framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+websockets==14.1
+python-multipart==0.0.17
+
+# ML core — CUDA 12.1 wheels
+torch==2.4.1
+torchvision==0.19.1
+torchaudio==2.4.1
+
+# Transformers & model
+transformers==4.51.0
+accelerate==1.2.1
+sentencepiece==0.2.0
+protobuf==5.29.1
+tiktoken==0.8.0
+
+# Vision / video
+Pillow==11.0.0
+decord==0.6.0
+opencv-python-headless==4.10.0.84
+imageio==2.36.1
+imageio-ffmpeg==0.5.1
+
+# Numeric
+numpy==1.26.4
+scipy==1.14.1
+
+# HuggingFace hub
+huggingface-hub==0.30.0
+
+# Misc
+einops==0.8.0
+timm==1.0.12
