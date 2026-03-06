@@ -136,7 +136,7 @@ from transformers.modeling_utils import PreTrainedModel
 from decord import VideoReader, cpu
 from scipy.spatial import cKDTree
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 # Patch: MiniCPM-V _tied_weights_keys → all_tied_weights_keys
@@ -616,12 +616,23 @@ async def run_async_msgs(msgs, images, config, temporal_ids, is_video, queue: as
 # ---------------------------------------------------------------------------
 app = FastAPI(title="MiniCPM-o 4.5", version="3.0.0")
 _executor = ThreadPoolExecutor(max_workers=2)
-PRO_DIR = Path(__file__).resolve().parent
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
 async def index():
-    return FileResponse(PRO_DIR / "live.html", media_type="text/html")
+    return {
+        "message": "MiniCPM-o 4.5 API",
+        "health": "/health",
+        "ws": "/ws",
+    }
 
 
 @app.get("/health")
