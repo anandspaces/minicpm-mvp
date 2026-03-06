@@ -112,6 +112,7 @@ import io
 import json
 import logging
 import math
+import subprocess
 import tempfile
 import threading
 import time
@@ -370,6 +371,42 @@ def build_temporal_ids_for_live_frames(n_frames: int, interval_ms: int = 200):
 # to non-streaming which always returns a plain string.
 # ---------------------------------------------------------------------------
 
+
+def _decode_audio_to_numpy(raw: bytes) -> tuple:
+    """Decode audio bytes to (samples, sr). Tries librosa first; on failure (e.g. WebM),
+    converts via ffmpeg to WAV then loads. Returns (audio_np, 16000) or raises."""
+    try:
+        audio_np, _ = librosa.load(io.BytesIO(raw), sr=16000, mono=True)
+        return (audio_np, 16000)
+    except Exception:
+        pass
+    # Fallback: convert to WAV with ffmpeg (stdin -> stdout)
+    try:
+        proc = subprocess.run(
+            [
+                "ffmpeg", "-y", "-i", "pipe:0",
+                "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                "-f", "wav", "pipe:1",
+            ],
+            input=raw,
+            capture_output=True,
+            timeout=30,
+        )
+        if proc.returncode != 0 or not proc.stdout:
+            raise RuntimeError(
+                "ffmpeg failed or produced no output. "
+                "Server cannot decode this audio format. Install ffmpeg."
+            )
+        audio_np, _ = librosa.load(io.BytesIO(proc.stdout), sr=16000, mono=True)
+        return (audio_np, 16000)
+    except FileNotFoundError:
+        raise RuntimeError(
+            "Server cannot decode this audio format (WebM). Install ffmpeg."
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Audio conversion timed out.")
+
+
 def _build_msgs(images: List[Image.Image], context: List[Dict]) -> List[Dict]:
     msgs = []
     for i, turn in enumerate(context):
@@ -409,6 +446,7 @@ def _base_kwargs(config: Dict, use_tts_template: bool = False) -> Dict[str, Any]
         enable_thinking=config.get("enable_thinking", False),
         use_tts_template=use_tts_template,
         max_new_tokens=config.get("max_new_tokens", 2048),
+        num_beams=1,  # required for streaming; bypasses broken file patch
     )
     sp = config.get("system_prompt", "")
     if sp:
@@ -712,10 +750,10 @@ async def ws_endpoint(websocket: WebSocket):
 
                 try:
                     raw = base64.b64decode(audio_b64)
-                    audio_np, _ = librosa.load(io.BytesIO(raw), sr=16000, mono=True)
+                    audio_np, _ = _decode_audio_to_numpy(raw)
                 except Exception as e:
                     log.exception("chat_with_audio decode failed: %s", e)
-                    await send("error", {"message": f"Invalid audio: {e}"})
+                    await send("error", {"message": str(e)})
                     continue
 
                 if mode == "photo":
