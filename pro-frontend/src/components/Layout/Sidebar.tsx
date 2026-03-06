@@ -8,15 +8,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Collapsible,
   CollapsibleContent,
-  CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
   Sheet,
   SheetContent,
 } from "@/components/ui/sheet";
-import { ChevronLeft, Settings } from "lucide-react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import { Settings } from "lucide-react";
 
 function SidebarContent() {
   const {
@@ -93,6 +90,7 @@ function SidebarContent() {
           onChange={(e) => setConfig({ system_prompt: e.target.value })}
         />
       </div>
+      {/* Full duplex only: live settings always relevant when tabs hidden */}
       {currentTab === "live" && (
         <>
           <h3 className="mt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -126,6 +124,7 @@ function SidebarContent() {
           </div>
         </>
       )}
+      {/* deprecated: video mode — Video Settings (UI is full duplex only) */}
       {currentTab === "video" && (
         <>
           <h3 className="mt-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -151,17 +150,16 @@ function SidebarContent() {
 }
 
 export function Sidebar() {
-  const { mobileSettingsOpen, setMobileSettingsOpen } = useApp();
-  const [open, setOpen] = useState(false);
+  const { mobileSettingsOpen, setMobileSettingsOpen, sidebarOpen, setSidebarOpen } = useApp();
 
   return (
     <>
-      {/* Desktop: collapsible inline sidebar */}
+      {/* Desktop: collapsible inline sidebar (trigger is in TopBar) */}
       <div className="relative hidden shrink-0 md:flex">
-        <Collapsible open={open} onOpenChange={setOpen} className="flex">
+        <Collapsible open={sidebarOpen} onOpenChange={setSidebarOpen} className="flex">
           <CollapsibleContent
             className="flex data-[state=closed]:hidden"
-            style={{ width: open ? 280 : 0, minWidth: open ? 280 : 0 }}
+            style={{ width: sidebarOpen ? 280 : 0, minWidth: sidebarOpen ? 280 : 0 }}
           >
             <aside
               className="flex w-[280px] flex-col gap-3.5 overflow-y-auto border-r border-border bg-card p-4"
@@ -170,19 +168,6 @@ export function Sidebar() {
               <SidebarContent />
             </aside>
           </CollapsibleContent>
-          <CollapsibleTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className={cn(
-                "absolute left-0 top-1/2 z-10 h-12 w-6 -translate-y-1/2 rounded-l-none border-l-0",
-                open && "left-[280px]"
-              )}
-              aria-label={open ? "Hide settings" : "Show settings"}
-            >
-              <ChevronLeft className={cn("size-3 transition-transform", open && "rotate-180")} />
-            </Button>
-          </CollapsibleTrigger>
         </Collapsible>
       </div>
 

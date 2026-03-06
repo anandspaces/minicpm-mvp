@@ -30,6 +30,15 @@ export type ClearedData = Record<string, never>;
 
 export type ConfigUpdatedData = { config: ModelConfig };
 
+export type DuplexStartedData = Record<string, never>;
+export type DuplexStoppedData = Record<string, never>;
+export type DuplexResultData = {
+  is_listen: boolean;
+  text: string;
+  audio_b64: string | null;
+  end_of_turn: boolean;
+};
+
 export type ModelConfig = {
   enable_thinking: boolean;
   do_sample: boolean;
@@ -54,6 +63,9 @@ export type ServerEvent =
   | { event: "chat_token"; data: ChatTokenData }
   | { event: "chat_done"; data: ChatDoneData }
   | { event: "chat_audio"; data: ChatAudioData }
+  | { event: "duplex_started"; data: DuplexStartedData }
+  | { event: "duplex_stopped"; data: DuplexStoppedData }
+  | { event: "duplex_result"; data: DuplexResultData }
   | { event: "error"; data: ErrorData }
   | { event: "cleared"; data: ClearedData }
   | { event: "config_updated"; data: ConfigUpdatedData };
@@ -67,6 +79,18 @@ export type RegenerateAction = { action: "regenerate" };
 export type SetConfigAction = { action: "set_config"; config: Partial<ModelConfig> };
 export type ClearAction = { action: "clear" };
 
+export type DuplexStartAction = {
+  action: "duplex_start";
+  system_prompt?: string;
+  ref_audio_b64?: string;
+};
+export type DuplexChunkAction = {
+  action: "duplex_chunk";
+  audio_b64: string;
+  frame_b64?: string;
+};
+export type DuplexStopAction = { action: "duplex_stop" };
+
 export type ClientAction =
   | UploadImagesAction
   | UploadVideoAction
@@ -75,7 +99,10 @@ export type ClientAction =
   | ChatAction
   | RegenerateAction
   | SetConfigAction
-  | ClearAction;
+  | ClearAction
+  | DuplexStartAction
+  | DuplexChunkAction
+  | DuplexStopAction;
 
 export type MessageRole = "user" | "assistant" | "system";
 

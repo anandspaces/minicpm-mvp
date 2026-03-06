@@ -53,6 +53,9 @@ type AppState = {
   lastChatAudio: { audio_b64: string; sample_rate: number } | null;
   captureIntervalMs: number;
   lastServerError: string | null;
+  duplexActive: boolean;
+  mediaStream: MediaStream | null;
+  streamError: string | null;
 };
 
 type AppContextValue = AppState & {
@@ -60,6 +63,8 @@ type AppContextValue = AppState & {
   lastError: string | null;
   mobileSettingsOpen: boolean;
   setMobileSettingsOpen: (open: boolean) => void;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
   send: (action: import("@/types/ws").ClientAction) => void;
   setConfig: (patch: Partial<ModelConfig>) => void;
   setCurrentTab: (tab: Mode) => void;
@@ -68,6 +73,8 @@ type AppContextValue = AppState & {
   clearLastChatAudio: () => void;
   clearLastServerError: () => void;
   setCaptureIntervalMs: (ms: number) => void;
+  startDuplex: () => Promise<void>;
+  stopDuplex: () => void;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -79,13 +86,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isStreaming: false,
     uploadStatus: "idle",
     uploadMessage: null,
-    currentTab: "photo",
+    currentTab: "live", // full duplex only; photo/video modes deprecated
     lastChatAudio: null,
     captureIntervalMs: 200,
     lastServerError: null,
+    duplexActive: false,
+    mediaStream: null,
+    streamError: null,
   });
   const streamingIdRef = useRef<string | null>(null);
+  const duplexStreamingIdRef = useRef<string | null>(null);
+  const duplexAudioQueueRef = useRef<string[]>([]);
+  const configRef = useRef(state.config);
+  configRef.current = state.config;
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const playNextDuplexAudio = useCallback(() => {
+    const q = duplexAudioQueueRef.current;
+    if (q.length === 0) return;
+    const b64 = q.shift();
+    if (!b64) {
+      playNextDuplexAudioRef.current();
+      return;
+    }
+    try {
+      const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const blob = new Blob([bin], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        playNextDuplexAudioRef.current();
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        playNextDuplexAudioRef.current();
+      };
+      audio.play().catch(() => {
+        URL.revokeObjectURL(url);
+        playNextDuplexAudioRef.current();
+      });
+    } catch {
+      playNextDuplexAudioRef.current();
+    }
+  }, []);
+  const playNextDuplexAudioRef = useRef(playNextDuplexAudio);
+  playNextDuplexAudioRef.current = playNextDuplexAudio;
 
   const onEvent = useCallback((ev: ServerEvent) => {
     switch (ev.event) {
@@ -157,14 +204,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
           lastChatAudio: { audio_b64: ev.data.audio_b64, sample_rate: ev.data.sample_rate },
         }));
         break;
+      case "duplex_started":
+        setState((s) => ({ ...s, duplexActive: true }));
+        break;
+      case "duplex_stopped":
+        setState((s) => ({ ...s, duplexActive: false }));
+        duplexStreamingIdRef.current = null;
+        break;
+      case "duplex_result": {
+        const { text, audio_b64: audioB64, end_of_turn: endOfTurn } = ev.data;
+        if (text) {
+          setState((s) => {
+            let id = duplexStreamingIdRef.current;
+            const idx = id ? s.messages.findIndex((m) => m.id === id) : -1;
+            if (idx >= 0) {
+              const next = [...s.messages];
+              next[idx] = {
+                ...next[idx],
+                content: next[idx].content + text,
+                streaming: !endOfTurn,
+              };
+              if (endOfTurn) duplexStreamingIdRef.current = null;
+              return { ...s, messages: next };
+            }
+            if (endOfTurn) {
+              return {
+                ...s,
+                messages: [...s.messages, { id: nextId(), role: "assistant", content: text, streaming: false }],
+              };
+            }
+            id = nextId();
+            duplexStreamingIdRef.current = id;
+            return {
+              ...s,
+              messages: [...s.messages, { id, role: "assistant", content: text, streaming: true }],
+            };
+          });
+        } else if (endOfTurn) {
+          duplexStreamingIdRef.current = null;
+        }
+        if (audioB64) {
+          duplexAudioQueueRef.current.push(audioB64);
+          playNextDuplexAudioRef.current();
+        }
+        break;
+      }
       case "error":
         setState((s) => ({
           ...s,
           messages: s.messages.map((m) => (m.streaming ? { ...m, streaming: false } : m)),
           isStreaming: false,
           lastServerError: ev.data.message,
+          ...(s.duplexActive ? { duplexActive: false } : {}),
         }));
         streamingIdRef.current = null;
+        duplexStreamingIdRef.current = null;
         break;
       case "cleared":
         setState((s) => ({
@@ -218,6 +312,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, captureIntervalMs: ms }));
   }, []);
 
+  const startDuplex = useCallback(async () => {
+    try {
+      setState((s) => ({ ...s, streamError: null }));
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setState((s) => ({ ...s, mediaStream: stream, streamError: null }));
+      const systemPrompt = configRef.current.system_prompt?.trim() || undefined;
+      send({ action: "duplex_start", system_prompt: systemPrompt });
+    } catch (err) {
+      setState((s) => ({
+        ...s,
+        streamError: err instanceof Error ? err.message : String(err),
+      }));
+    }
+  }, [send]);
+
+  const stopDuplex = useCallback(() => {
+    setState((s) => {
+      const stream = s.mediaStream;
+      if (stream) {
+        send({ action: "duplex_stop" });
+        stream.getTracks().forEach((t) => t.stop());
+        return { ...s, mediaStream: null, streamError: null };
+      }
+      return s;
+    });
+  }, [send]);
+
   const value = useMemo<AppContextValue>(
     () => ({
       ...state,
@@ -225,6 +346,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       lastError,
       mobileSettingsOpen,
       setMobileSettingsOpen,
+      sidebarOpen,
+      setSidebarOpen,
       send,
       setConfig,
       setCurrentTab,
@@ -233,12 +356,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearLastChatAudio,
       clearLastServerError,
       setCaptureIntervalMs,
+      startDuplex,
+      stopDuplex,
     }),
     [
       state,
       wsStatus,
       lastError,
       mobileSettingsOpen,
+      sidebarOpen,
       send,
       setConfig,
       setCurrentTab,
@@ -247,6 +373,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       clearLastChatAudio,
       clearLastServerError,
       setCaptureIntervalMs,
+      startDuplex,
+      stopDuplex,
     ]
   );
 
