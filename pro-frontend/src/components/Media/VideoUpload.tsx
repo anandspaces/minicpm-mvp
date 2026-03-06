@@ -47,7 +47,7 @@ export function VideoUpload() {
     <div className="flex flex-col gap-2">
       <Card
         className={cn(
-          "flex cursor-pointer flex-col items-center justify-center border-2 border-dashed p-7 text-center text-sm text-muted-foreground transition-colors hover:border-primary/50",
+          "flex max-w-full cursor-pointer flex-col items-center justify-center border-2 border-dashed p-4 text-center text-sm text-muted-foreground transition-colors hover:border-primary/50 sm:p-7",
           uploadStatus === "uploading" && "opacity-70"
         )}
         onClick={() => inputRef.current?.click()}

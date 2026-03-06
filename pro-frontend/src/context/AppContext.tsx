@@ -58,6 +58,8 @@ type AppState = {
 type AppContextValue = AppState & {
   wsStatus: "connecting" | "open" | "closed" | "error";
   lastError: string | null;
+  mobileSettingsOpen: boolean;
+  setMobileSettingsOpen: (open: boolean) => void;
   send: (action: import("@/types/ws").ClientAction) => void;
   setConfig: (patch: Partial<ModelConfig>) => void;
   setCurrentTab: (tab: Mode) => void;
@@ -83,6 +85,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     lastServerError: null,
   });
   const streamingIdRef = useRef<string | null>(null);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
 
   const onEvent = useCallback((ev: ServerEvent) => {
     switch (ev.event) {
@@ -220,6 +223,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state,
       wsStatus: wsStatus as AppContextValue["wsStatus"],
       lastError,
+      mobileSettingsOpen,
+      setMobileSettingsOpen,
       send,
       setConfig,
       setCurrentTab,
@@ -233,6 +238,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       state,
       wsStatus,
       lastError,
+      mobileSettingsOpen,
       send,
       setConfig,
       setCurrentTab,

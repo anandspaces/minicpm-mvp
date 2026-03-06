@@ -18,7 +18,7 @@ export function MessageList() {
       role="log"
       aria-live="polite"
     >
-      <div className="flex flex-col gap-3 px-5 py-4">
+      <div className="flex flex-col gap-3 px-3 py-4 sm:px-5">
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
         ))}

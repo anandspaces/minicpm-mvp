@@ -141,9 +141,9 @@ export function ChatInput() {
 
   return (
     <div
-      className={`flex shrink-0 gap-2 border-t border-border bg-card px-5 py-3 ${isListening ? "ring-1 ring-primary/50" : ""}`}
+      className={`flex shrink-0 flex-col gap-2 border-t border-border bg-card px-3 py-3 sm:flex-row sm:px-5 ${isListening ? "ring-1 ring-primary/50" : ""}`}
     >
-      <div className="flex flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <Input
           className="min-h-0"
           placeholder="Type or speak…"
@@ -164,7 +164,7 @@ export function ChatInput() {
           disabled={isStreaming}
           aria-label="Chat message"
         />
-        <span className="text-[11px] text-muted-foreground">{sttHint}</span>
+        <span className="truncate text-[11px] text-muted-foreground">{sttHint}</span>
       </div>
       <input
         ref={voiceInputRef}
@@ -185,39 +185,44 @@ export function ChatInput() {
           reader.readAsDataURL(file);
         }}
       />
-      <Button
-        type="button"
-        variant="secondary"
-        size="icon"
-        onClick={() => voiceInputRef.current?.click()}
-        disabled={isStreaming}
-        aria-label="Upload voice message"
-      >
-        <Mic className="size-4" />
-      </Button>
-      <Button type="button" onClick={sendChat} disabled={isStreaming} aria-label="Send message">
-        <Send className="size-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        size="icon"
-        onClick={() => send({ action: "regenerate" })}
-        disabled={isStreaming || messages.length < 2}
-        aria-label="Regenerate last response"
-      >
-        <RotateCcw className="size-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="secondary"
-        size="icon"
-        onClick={() => send({ action: "clear" })}
-        disabled={isStreaming}
-        aria-label="Clear chat"
-      >
-        <X className="size-4" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="size-9 min-h-11 min-w-11 sm:size-9"
+          onClick={() => voiceInputRef.current?.click()}
+          disabled={isStreaming}
+          aria-label="Upload voice message"
+        >
+          <Mic className="size-4" />
+        </Button>
+        <Button type="button" onClick={sendChat} disabled={isStreaming} aria-label="Send message" className="size-9 min-h-11 min-w-11 sm:size-9">
+          <Send className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="size-9 min-h-11 min-w-11 sm:size-9"
+          onClick={() => send({ action: "regenerate" })}
+          disabled={isStreaming || messages.length < 2}
+          aria-label="Regenerate last response"
+        >
+          <RotateCcw className="size-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="icon"
+          className="size-9 min-h-11 min-w-11 sm:size-9"
+          onClick={() => send({ action: "clear" })}
+          disabled={isStreaming}
+          aria-label="Clear chat"
+        >
+          <X className="size-4" />
+        </Button>
+      </div>
     </div>
   );
 }

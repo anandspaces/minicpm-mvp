@@ -74,15 +74,15 @@ export function LiveWebcam() {
   }, [stream]);
 
   return (
-    <div className="flex gap-4">
+    <div className="flex min-w-0 flex-col gap-4 sm:flex-row">
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="h-[180px] w-[240px] rounded-lg bg-black object-cover"
+        className="max-h-[180px] w-full max-w-full rounded-lg bg-black object-cover sm:w-[240px]"
       />
-      <div className="flex flex-col gap-2">
+      <div className="flex shrink-0 flex-col gap-2">
         <Button
           variant="default"
           className="bg-green-600 hover:bg-green-700"

@@ -29,22 +29,22 @@ function AppContent() {
         onValueChange={(v) => setCurrentTab(v as "photo" | "video" | "live")}
         className="flex flex-1 flex-col overflow-hidden"
       >
-        <TabsList className="flex shrink-0 justify-start gap-0 rounded-none border-b border-border bg-card px-5">
+        <TabsList className="flex min-w-0 shrink-0 flex-nowrap justify-start gap-0 overflow-x-auto rounded-none border-b border-border bg-card px-3 sm:px-5">
           <TabsTrigger
             value="photo"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary"
+            className="shrink-0 rounded-none border-b-2 border-transparent text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:text-primary"
           >
             Photo Chat
           </TabsTrigger>
           <TabsTrigger
             value="video"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary"
+            className="shrink-0 rounded-none border-b-2 border-transparent text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:text-primary"
           >
             Video Chat
           </TabsTrigger>
           <TabsTrigger
             value="live"
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary"
+            className="shrink-0 rounded-none border-b-2 border-transparent text-xs sm:text-sm data-[state=active]:border-primary data-[state=active]:text-primary"
           >
             Live Video
           </TabsTrigger>
@@ -52,7 +52,7 @@ function AppContent() {
         <div className="flex min-h-0 flex-1">
           <Sidebar />
           <div className="flex min-w-0 flex-1 flex-col">
-            <div className="shrink-0 border-b border-border px-5 py-4">
+            <div className="shrink-0 border-b border-border px-3 py-4 sm:px-5">
               {currentTab === "photo" && <PhotoDropzone />}
               {currentTab === "video" && <VideoUpload />}
               {currentTab === "live" && <LiveWebcam />}
