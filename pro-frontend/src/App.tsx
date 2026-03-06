@@ -1,35 +1,78 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useEffect } from "react";
+import { Toaster } from "@/components/ui/sonner";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AppProvider, useApp } from "@/context/AppContext";
+import { TopBar } from "@/components/Layout/TopBar";
+import { Sidebar } from "@/components/Layout/Sidebar";
+import { PhotoDropzone } from "@/components/Media/PhotoDropzone";
+import { VideoUpload } from "@/components/Media/VideoUpload";
+import { LiveWebcam } from "@/components/Media/LiveWebcam";
+import { MessageList } from "@/components/Chat/MessageList";
+import { ChatInput } from "@/components/Chat/ChatInput";
+import { toast } from "sonner";
 
-function App() {
-  const [count, setCount] = useState(0)
+function AppContent() {
+  const { lastServerError, clearLastServerError, currentTab, setCurrentTab } = useApp();
+
+  useEffect(() => {
+    if (lastServerError) {
+      toast.error(lastServerError);
+      clearLastServerError();
+    }
+  }, [lastServerError, clearLastServerError]);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+      <TopBar />
+      <Tabs
+        value={currentTab}
+        onValueChange={(v) => setCurrentTab(v as "photo" | "video" | "live")}
+        className="flex flex-1 flex-col overflow-hidden"
+      >
+        <TabsList className="flex shrink-0 justify-start gap-0 rounded-none border-b border-border bg-card px-5">
+          <TabsTrigger
+            value="photo"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary"
+          >
+            Photo Chat
+          </TabsTrigger>
+          <TabsTrigger
+            value="video"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary"
+          >
+            Video Chat
+          </TabsTrigger>
+          <TabsTrigger
+            value="live"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary"
+          >
+            Live Video
+          </TabsTrigger>
+        </TabsList>
+        <div className="flex min-h-0 flex-1">
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="shrink-0 border-b border-border px-5 py-4">
+              {currentTab === "photo" && <PhotoDropzone />}
+              {currentTab === "video" && <VideoUpload />}
+              {currentTab === "live" && <LiveWebcam />}
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col">
+              <MessageList />
+              <ChatInput />
+            </div>
+          </div>
+        </div>
+      </Tabs>
+    </div>
+  );
 }
 
-export default App
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+      <Toaster theme="dark" />
+    </AppProvider>
+  );
+}
